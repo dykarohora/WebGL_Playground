@@ -39,6 +39,36 @@ class AppMain {
       throw new Error(compileLog)
     }
   }
+
+  public createProgram(vs: WebGLShader, fs: WebGLShader): WebGLProgram {
+    const program = this.context.createProgram()
+    // シェーダーのアタッチ
+    this.context.attachShader(program, vs)
+    this.context.attachShader(program, fs)
+    // 2つのシェーダーをリンク
+    this.context.linkProgram(program)
+
+    if (this.context.getProgramParameter(program, this.context.LINK_STATUS)) {
+      // プログラムオブジェクトの有効か
+      this.context.useProgram(program)
+      return program
+    } else {
+      const programLog = this.context.getProgramInfoLog(program)
+      throw new Error(programLog)
+    }
+  }
+
+  public createVBO(data): WebGLBuffer {
+    const vbo = this.context.createBuffer()
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vbo)
+    this.context.bufferData(
+      this.context.ARRAY_BUFFER,
+      new Float32Array(data),
+      this.context.STATIC_DRAW
+    )
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, null)
+    return vbo
+  }
 }
 
 onload = (): void => {
@@ -52,6 +82,8 @@ onload = (): void => {
   const app = new AppMain(c)
   app.clearColor()
 
-  app.createShader('vs')
-  app.createShader('fs')
+  const vertexShader = app.createShader('vs')
+  const fragmentShader = app.createShader('fs')
+
+  const program = app.createProgram(vertexShader, fragmentShader)
 }
