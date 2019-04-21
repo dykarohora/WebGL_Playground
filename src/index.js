@@ -1,31 +1,71 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const Matrix_1 = require("./Matrix");
-class AppMain {
+var ShaderType;
+(function (ShaderType) {
+    ShaderType[ShaderType["Vertex"] = 0] = "Vertex";
+    ShaderType[ShaderType["Fragment"] = 1] = "Fragment";
+})(ShaderType || (ShaderType = {}));
+class App {
     constructor(canvas) {
+        this.uniLocations = [];
         this.context = canvas.getContext('webgl');
-    }
-    clearColor() {
+        this.startTime = new Date().getTime();
+        this.time = 0;
+        this.tempTime = 0;
+        this.fps = 1000 / 30;
+        this.width = canvas.width;
+        this.height = canvas.height;
+        this.mouseX = 0.5;
+        this.mouseY = 0.5;
         this.context.clearColor(0, 0, 0, 1);
-        this.context.clearDepth(1.0);
-        this.context.clear(this.context.COLOR_BUFFER_BIT | this.context.DEPTH_BUFFER_BIT);
     }
-    createShader(id) {
+    createProgram(vertexShaderId, fragmentShaderid) {
+        this.vertexShader = this.createShader(vertexShaderId, ShaderType.Vertex);
+        this.fragmentShader = this.createShader(fragmentShaderid, ShaderType.Fragment);
+        this.program = this.context.createProgram();
+        this.context.attachShader(this.program, this.vertexShader);
+        this.context.attachShader(this.program, this.fragmentShader);
+        this.context.linkProgram(this.program);
+        if (this.context.getProgramParameter(this.program, this.context.LINK_STATUS)) {
+            this.context.useProgram(this.program);
+            this.uniLocations[0] = this.context.getUniformLocation(this.program, 'time');
+            this.uniLocations[1] = this.context.getUniformLocation(this.program, 'mouse');
+            this.uniLocations[2] = this.context.getUniformLocation(this.program, 'resolution');
+        }
+        else {
+            const programLog = this.context.getProgramInfoLog(this.program);
+            throw new Error(programLog);
+        }
+    }
+    setPositionAndIndex(positions, indices) {
+        const vPosition = this.createVbo(positions);
+        const vIndex = this.createIbo(indices);
+        const vAttLocation = this.context.getAttribLocation(this.program, 'position');
+        this.context.bindBuffer(this.context.ARRAY_BUFFER, vPosition);
+        this.context.enableVertexAttribArray(vAttLocation);
+        this.context.vertexAttribPointer(vAttLocation, 3, this.context.FLOAT, false, 0, 0);
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, vIndex);
+    }
+    render() {
+        this.time = (new Date().getTime() - this.startTime) * 0.001;
+        this.context.clear(this.context.COMPILE_STATUS);
+        this.context.uniform1f(this.uniLocations[0], this.time + this.tempTime);
+        this.context.uniform2fv(this.uniLocations[1], [this.mouseX, this.mouseY]);
+        this.context.uniform2fv(this.uniLocations[2], [this.width, this.height]);
+        this.context.drawElements(this.context.TRIANGLES, 6, this.context.UNSIGNED_SHORT, 0);
+        this.context.flush();
+        setTimeout(this.render, this.fps);
+    }
+    createShader(id, shaderType) {
         let shader;
         const scriptElement = document.getElementById(id);
         if (!scriptElement) {
-            return;
+            throw new Error('Script Element invalid');
         }
-        switch (scriptElement.type) {
-            case 'x-shader/x-vertex':
+        switch (shaderType) {
+            case ShaderType.Vertex:
                 shader = this.context.createShader(this.context.VERTEX_SHADER);
-                this.vertexShader = shader;
                 break;
-            case 'x-shader/x-fragment':
+            case ShaderType.Fragment:
                 shader = this.context.createShader(this.context.FRAGMENT_SHADER);
-                this.fragmentShader = shader;
-                break;
-            default:
                 break;
         }
         this.context.shaderSource(shader, scriptElement.text);
@@ -38,68 +78,43 @@ class AppMain {
             throw new Error(compileLog);
         }
     }
-    createProgram(vs, fs) {
-        const program = this.context.createProgram();
-        // シェーダーのアタッチ
-        this.context.attachShader(program, vs);
-        this.context.attachShader(program, fs);
-        // 2つのシェーダーをリンク
-        this.context.linkProgram(program);
-        if (this.context.getProgramParameter(program, this.context.LINK_STATUS)) {
-            // プログラムオブジェクトの有効か
-            this.context.useProgram(program);
-            this.program = program;
-            return program;
-        }
-        else {
-            const programLog = this.context.getProgramInfoLog(program);
-            throw new Error(programLog);
-        }
-    }
-    createVBO(data) {
+    createVbo(data) {
         const vbo = this.context.createBuffer();
         this.context.bindBuffer(this.context.ARRAY_BUFFER, vbo);
         this.context.bufferData(this.context.ARRAY_BUFFER, new Float32Array(data), this.context.STATIC_DRAW);
-        this.context.bindBuffer(this.context.ARRAY_BUFFER, vbo);
+        this.context.bindBuffer(this.context.ARRAY_BUFFER, null);
         return vbo;
     }
-    bindVBO(vbo) {
-        this.context.bindBuffer(this.context.ARRAY_BUFFER, vbo);
-        const attLocation = this.context.getAttribLocation(this.program, 'position');
-        const stride = 3;
-        this.context.enableVertexAttribArray(attLocation);
-        this.context.vertexAttribPointer(attLocation, stride, this.context.FLOAT, false, 0, 0);
-    }
-    bindMVP(mvpMatrix) {
-        const uniLocation = this.context.getUniformLocation(this.program, 'mvpMatrix');
-        this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix);
-    }
-    draw() {
-        this.context.drawArrays(this.context.TRIANGLES, 0, 3);
-        this.context.flush();
+    createIbo(data) {
+        const ibo = this.context.createBuffer();
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, ibo);
+        this.context.bufferData(this.context.ELEMENT_ARRAY_BUFFER, new Int16Array(data), this.context.STATIC_DRAW);
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, null);
+        return ibo;
     }
 }
-onload = () => {
-    const c = document.getElementById('canvas');
-    c.width = 500;
-    c.height = 300;
-    const app = new AppMain(c);
-    app.clearColor();
-    const vertexShader = app.createShader('vs');
-    const fragmentShader = app.createShader('fs');
-    const program = app.createProgram(vertexShader, fragmentShader);
-    const vertexPositions = [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0];
-    const vbo = app.createVBO(vertexPositions);
-    app.bindVBO(vbo);
-    const mMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    const vMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    const pMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    const mvpMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    Matrix_1.default.lookAt(new Float32Array([0.0, 1.0, 3.0]), new Float32Array([0, 0, 0]), new Float32Array([0, 1, 0]), vMatrix);
-    Matrix_1.default.perspective(90, c.width / c.height, 0.1, 100, pMatrix);
-    Matrix_1.default.multiply(pMatrix, vMatrix, mvpMatrix);
-    Matrix_1.default.multiply(mvpMatrix, mMatrix, mvpMatrix);
-    app.bindVBO(mvpMatrix);
-    app.draw();
+window.onload = () => {
+    const canvas = document.getElementById('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const app = new App(canvas);
+    app.createProgram('vs', 'fs');
+    const position = [
+        -1.0,
+        1.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        -1.0,
+        -1.0,
+        0.0,
+        1.0,
+        -1.0,
+        0.0
+    ];
+    const index = [0, 2, 1, 1, 2, 3];
+    app.setPositionAndIndex(position, index);
+    app.render();
 };
 //# sourceMappingURL=index.js.map
