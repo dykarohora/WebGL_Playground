@@ -15,7 +15,7 @@ class App {
         this.height = canvas.height;
         this.mouseX = 0.5;
         this.mouseY = 0.5;
-        this.context.clearColor(0, 0, 0, 1);
+        canvas.addEventListener('mousemove', this.mouseMove.bind(this), true);
     }
     createProgram(vertexShaderId, fragmentShaderid) {
         this.vertexShader = this.createShader(vertexShaderId, ShaderType.Vertex);
@@ -46,13 +46,14 @@ class App {
     }
     render() {
         this.time = (new Date().getTime() - this.startTime) * 0.001;
-        this.context.clear(this.context.COMPILE_STATUS);
+        this.context.clearColor(0, 0, 0, 1);
+        this.context.clear(this.context.COLOR_BUFFER_BIT);
         this.context.uniform1f(this.uniLocations[0], this.time + this.tempTime);
         this.context.uniform2fv(this.uniLocations[1], [this.mouseX, this.mouseY]);
         this.context.uniform2fv(this.uniLocations[2], [this.width, this.height]);
         this.context.drawElements(this.context.TRIANGLES, 6, this.context.UNSIGNED_SHORT, 0);
         this.context.flush();
-        setTimeout(this.render, this.fps);
+        setTimeout(this.render.bind(this), this.fps);
     }
     createShader(id, shaderType) {
         let shader;
@@ -92,11 +93,15 @@ class App {
         this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, null);
         return ibo;
     }
+    mouseMove(e) {
+        this.mouseX = e.offsetX / this.width;
+        this.mouseY = e.offsetY / this.height;
+    }
 }
 window.onload = () => {
     const canvas = document.getElementById('canvas');
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = 1024;
+    canvas.height = 1024;
     const app = new App(canvas);
     app.createProgram('vs', 'fs');
     const position = [
@@ -117,4 +122,4 @@ window.onload = () => {
     app.setPositionAndIndex(position, index);
     app.render();
 };
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=RayMarching.js.map
