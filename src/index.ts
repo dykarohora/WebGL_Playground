@@ -56,7 +56,12 @@ class AppMain {
     }
   }
 
-  public setPositions(positions: number[]) {
+  public setPositionAndColor(positions: number[], colors: number[]) {
+    this.setPositions(positions)
+    this.setColors(colors)
+  }
+
+  private setPositions(positions: number[]) {
     const vPositionBuffer = this.createVbo(positions)
     const vAttLocation = this.context.getAttribLocation(
       this.program,
@@ -65,6 +70,23 @@ class AppMain {
     const vStride = 3
 
     this.context.bindBuffer(this.context.ARRAY_BUFFER, vPositionBuffer)
+    this.context.enableVertexAttribArray(vAttLocation)
+    this.context.vertexAttribPointer(
+      vAttLocation,
+      vStride,
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
+
+  private setColors(colors: number[]) {
+    const vColorBuffer = this.createVbo(colors)
+    const vAttLocation = this.context.getAttribLocation(this.program, 'color')
+    const vStride = 4
+
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vColorBuffer)
     this.context.enableVertexAttribArray(vAttLocation)
     this.context.vertexAttribPointer(
       vAttLocation,
@@ -158,7 +180,8 @@ onload = (): void => {
     1.0
   ]
 
-  app.setPositions(vertexPositions)
+  // app.setPositions(vertexPositions)
+  app.setPositionAndColor(vertexPositions, vertexColor)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
