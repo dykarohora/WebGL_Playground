@@ -1,134 +1,44 @@
-enum ShaderType {
-  Vertex,
-  Fragment
-}
+import Matrix from './Matrix'
 
-class App {
+class AppMain {
   private readonly context: WebGLRenderingContext
 
   private vertexShader: WebGLShader
   private fragmentShader: WebGLShader
-
   private program: WebGLProgram
-
-  private uniLocations: WebGLUniformLocation[] = []
-
-  private startTime: number
-  private tempTime: number
-  private time: number
-  private fps: number
-
-  private width: number
-  private height: number
-
-  private mouseX: number
-  private mouseY: number
+  private vertexVbo: WebGLBuffer
+  private colorVbo: WebGLBuffer
 
   public constructor(canvas: HTMLCanvasElement) {
     this.context = canvas.getContext('webgl')
-    this.startTime = new Date().getTime()
-    this.time = 0
-    this.tempTime = 0
-    this.fps = 1000 / 30
-    this.width = canvas.width
-    this.height = canvas.height
-    this.mouseX = 0.5
-    this.mouseY = 0.5
-
-    canvas.addEventListener('mousemove', this.mouseMove.bind(this), true)
   }
 
-  public createProgram(vertexShaderId: string, fragmentShaderid: string) {
-    this.vertexShader = this.createShader(vertexShaderId, ShaderType.Vertex)
-    this.fragmentShader = this.createShader(
-      fragmentShaderid,
-      ShaderType.Fragment
-    )
-
-    this.program = this.context.createProgram()
-    this.context.attachShader(this.program, this.vertexShader)
-    this.context.attachShader(this.program, this.fragmentShader)
-    this.context.linkProgram(this.program)
-
-    if (
-      this.context.getProgramParameter(this.program, this.context.LINK_STATUS)
-    ) {
-      this.context.useProgram(this.program)
-
-      this.uniLocations[0] = this.context.getUniformLocation(
-        this.program,
-        'time'
-      )
-      this.uniLocations[1] = this.context.getUniformLocation(
-        this.program,
-        'mouse'
-      )
-      this.uniLocations[2] = this.context.getUniformLocation(
-        this.program,
-        'resolution'
-      )
-    } else {
-      const programLog = this.context.getProgramInfoLog(this.program)
-      throw new Error(programLog)
-    }
-  }
-
-  public setPositionAndIndex(positions: number[], indices: number[]) {
-    const vPosition = this.createVbo(positions)
-    const vIndex = this.createIbo(indices)
-
-    const vAttLocation = this.context.getAttribLocation(
-      this.program,
-      'position'
-    )
-
-    this.context.bindBuffer(this.context.ARRAY_BUFFER, vPosition)
-    this.context.enableVertexAttribArray(vAttLocation)
-    this.context.vertexAttribPointer(
-      vAttLocation,
-      3,
-      this.context.FLOAT,
-      false,
-      0,
-      0
-    )
-    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, vIndex)
-  }
-
-  public render() {
-    this.time = (new Date().getTime() - this.startTime) * 0.001
-
+  public clearColor() {
     this.context.clearColor(0, 0, 0, 1)
-    this.context.clear(this.context.COLOR_BUFFER_BIT)
-
-    this.context.uniform1f(this.uniLocations[0], this.time + this.tempTime)
-    this.context.uniform2fv(this.uniLocations[1], [this.mouseX, this.mouseY])
-    this.context.uniform2fv(this.uniLocations[2], [this.width, this.height])
-
-    this.context.drawElements(
-      this.context.TRIANGLES,
-      6,
-      this.context.UNSIGNED_SHORT,
-      0
+    this.context.clearDepth(1.0)
+    this.context.clear(
+      this.context.COLOR_BUFFER_BIT | this.context.DEPTH_BUFFER_BIT
     )
-    this.context.flush()
-    setTimeout(this.render.bind(this), this.fps)
   }
 
-  private createShader(id: string, shaderType: ShaderType): WebGLShader {
+  public createShader(id: string): WebGLShader {
     let shader: WebGLShader
     const scriptElement = document.getElementById(id) as HTMLScriptElement
 
     if (!scriptElement) {
-      throw new Error('Script Element invalid')
+      return
     }
 
-    switch (shaderType) {
-      case ShaderType.Vertex:
+    switch (scriptElement.type) {
+      case 'x-shader/x-vertex':
         shader = this.context.createShader(this.context.VERTEX_SHADER)
+        this.vertexShader = shader
         break
-      case ShaderType.Fragment:
+      case 'x-shader/x-fragment':
         shader = this.context.createShader(this.context.FRAGMENT_SHADER)
+        this.fragmentShader = shader
+        break
+      default:
         break
     }
 
@@ -143,60 +53,145 @@ class App {
     }
   }
 
-  private createVbo(data: number[]): WebGLBuffer {
-    const vbo = this.context.createBuffer()
-    this.context.bindBuffer(this.context.ARRAY_BUFFER, vbo)
+  public createProgram(vs: WebGLShader, fs: WebGLShader): WebGLProgram {
+    const program = this.context.createProgram()
+    // シェーダーのアタッチ
+    this.context.attachShader(program, vs)
+    this.context.attachShader(program, fs)
+    // 2つのシェーダーをリンク
+    this.context.linkProgram(program)
+
+    if (this.context.getProgramParameter(program, this.context.LINK_STATUS)) {
+      // プログラムオブジェクトの有効か
+      this.context.useProgram(program)
+      this.program = program
+      return program
+    } else {
+      const programLog = this.context.getProgramInfoLog(program)
+      throw new Error(programLog)
+    }
+  }
+
+  public createVBO(vertices: number[], colors: number[]): WebGLBuffer {
+    const vertexVbo = this.context.createBuffer()
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vertexVbo)
     this.context.bufferData(
       this.context.ARRAY_BUFFER,
-      new Float32Array(data),
+      new Float32Array(vertices),
       this.context.STATIC_DRAW
     )
     this.context.bindBuffer(this.context.ARRAY_BUFFER, null)
-    return vbo
-  }
+    this.vertexVbo = vertexVbo
 
-  private createIbo(data: number[]): WebGLBuffer {
-    const ibo = this.context.createBuffer()
-    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, ibo)
+    const colorVbo = this.context.createBuffer()
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, colorVbo)
     this.context.bufferData(
-      this.context.ELEMENT_ARRAY_BUFFER,
-      new Int16Array(data),
+      this.context.ARRAY_BUFFER,
+      new Float32Array(colors),
       this.context.STATIC_DRAW
     )
-    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, null)
-    return ibo
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, null)
+    this.colorVbo = colorVbo
+    return vertexVbo
   }
 
-  private mouseMove(e: MouseEvent) {
-    this.mouseX = e.offsetX / this.width
-    this.mouseY = e.offsetY / this.height
+  public bindVBO() {
+    const attLocation = new Array(2)
+    attLocation[0] = this.context.getAttribLocation(this.program, 'position')
+    attLocation[1] = this.context.getAttribLocation(this.program, 'color')
+
+    const attStride = new Array(2)
+    attStride[0] = 3
+    attStride[1] = 4
+
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, this.vertexVbo)
+    this.context.enableVertexAttribArray(attLocation[0])
+    this.context.vertexAttribPointer(
+      attLocation[0],
+      attStride[0],
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, this.colorVbo)
+    this.context.enableVertexAttribArray(attLocation[1])
+    this.context.vertexAttribPointer(
+      attLocation[1],
+      attStride[1],
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
+
+  public bindMVP(mvpMatrix: Float32Array) {
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'mvpMatrix'
+    )
+    this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix)
+  }
+
+  public draw() {
+    this.context.drawArrays(this.context.TRIANGLES, 0, 3)
+    this.context.flush()
   }
 }
 
-window.onload = () => {
-  const canvas = document.getElementById('canvas') as HTMLCanvasElement
-  canvas.width = 1024
-  canvas.height = 1024
+onload = (): void => {
+  const c: HTMLCanvasElement = document.getElementById(
+    'canvas'
+  ) as HTMLCanvasElement
 
-  const app = new App(canvas)
-  app.createProgram('vs', 'fs')
+  c.width = 500
+  c.height = 300
 
-  const position = [
-    -1.0,
+  const app = new AppMain(c)
+  app.clearColor()
+
+  const vertexShader = app.createShader('vs')
+  const fragmentShader = app.createShader('fs')
+  app.createProgram(vertexShader, fragmentShader)
+
+  const vertexPositions = [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]
+  const vertexColor = [
+    1.0,
+    0.0,
+    0.0,
     1.0,
     0.0,
     1.0,
-    1.0,
-    0.0,
-    -1.0,
-    -1.0,
     0.0,
     1.0,
-    -1.0,
-    0.0
+    0.0,
+    0.0,
+    1.0,
+    1.0
   ]
-  const index = [0, 2, 1, 1, 2, 3]
 
-  app.setPositionAndIndex(position, index)
-  app.render()
+  app.createVBO(vertexPositions, vertexColor)
+  app.bindVBO()
+
+  const mMatrix = Matrix.identity(Matrix.create())
+  const vMatrix = Matrix.identity(Matrix.create())
+  const pMatrix = Matrix.identity(Matrix.create())
+  const mvpMatrix = Matrix.identity(Matrix.create())
+
+  Matrix.lookAt(
+    new Float32Array([0.0, 1.0, 3.0]),
+    new Float32Array([0, 0, 0]),
+    new Float32Array([0, 1, 0]),
+    vMatrix
+  )
+
+  Matrix.perspective(60, c.width / c.height, 0.1, 100, pMatrix)
+
+  Matrix.multiply(pMatrix, vMatrix, mvpMatrix)
+  Matrix.multiply(mvpMatrix, mMatrix, mvpMatrix)
+
+  app.bindMVP(mvpMatrix)
+  app.draw()
 }
