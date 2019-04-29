@@ -13,11 +13,13 @@ class AppMain {
 
   private program: WebGLProgram
 
-  private vertexVbo: WebGLBuffer
-  private colorVbo: WebGLBuffer
-
   private width: number
   private height: number
+
+  private viewProjectionMatrix: Float32Array
+  private modelMatrix: Float32Array
+
+  private count: number = 0
 
   public constructor(canvas: HTMLCanvasElement) {
     this.context = canvas.getContext('webgl')
@@ -56,49 +58,20 @@ class AppMain {
     }
   }
 
-  public setPositionAndColor(positions: number[], colors: number[]) {
-    this.setPositions(positions)
+  public setVerticesAndColor(vertices: number[], colors: number[]): void {
+    this.setVertices(vertices)
     this.setColors(colors)
   }
 
-  private setPositions(positions: number[]) {
-    const vPositionBuffer = this.createVbo(positions)
-    const vAttLocation = this.context.getAttribLocation(
-      this.program,
-      'position'
-    )
-    const vStride = 3
-
-    this.context.bindBuffer(this.context.ARRAY_BUFFER, vPositionBuffer)
-    this.context.enableVertexAttribArray(vAttLocation)
-    this.context.vertexAttribPointer(
-      vAttLocation,
-      vStride,
-      this.context.FLOAT,
-      false,
-      0,
-      0
-    )
+  public setViewProjectionMatrix(matrix: Float32Array) {
+    this.viewProjectionMatrix = matrix
   }
 
-  private setColors(colors: number[]) {
-    const vColorBuffer = this.createVbo(colors)
-    const vAttLocation = this.context.getAttribLocation(this.program, 'color')
-    const vStride = 4
+  public setModelMatrix(matrix: Float32Array) {
+    this.modelMatrix = matrix
+    const mvpMatrix = Matrix.identity(Matrix.create())
+    Matrix.multiply(this.viewProjectionMatrix, this.modelMatrix, mvpMatrix)
 
-    this.context.bindBuffer(this.context.ARRAY_BUFFER, vColorBuffer)
-    this.context.enableVertexAttribArray(vAttLocation)
-    this.context.vertexAttribPointer(
-      vAttLocation,
-      vStride,
-      this.context.FLOAT,
-      false,
-      0,
-      0
-    )
-  }
-
-  public bindMVP(mvpMatrix: Float32Array) {
     const uniLocation = this.context.getUniformLocation(
       this.program,
       'mvpMatrix'
@@ -106,9 +79,19 @@ class AppMain {
     this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix)
   }
 
-  public draw() {
+  public get currentCount() {
+    return this.count
+  }
+
+  public startRender(update: () => void): void {
+    setInterval((): void => {
+      this.count++
+      update()
+    }, 1000 / 30)
+  }
+
+  public draw(): void {
     this.context.drawArrays(this.context.TRIANGLES, 0, 3)
-    this.context.flush()
   }
 
   private createShader(id: string, shaderType: ShaderType): WebGLShader {
@@ -150,6 +133,43 @@ class AppMain {
     this.context.bindBuffer(this.context.ARRAY_BUFFER, null)
     return vbo
   }
+
+  private setVertices(positions: number[]): void {
+    const vPositionBuffer = this.createVbo(positions)
+    const vAttLocation = this.context.getAttribLocation(
+      this.program,
+      'position'
+    )
+    const vStride = 3
+
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vPositionBuffer)
+    this.context.enableVertexAttribArray(vAttLocation)
+    this.context.vertexAttribPointer(
+      vAttLocation,
+      vStride,
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
+
+  private setColors(colors: number[]): void {
+    const vColorBuffer = this.createVbo(colors)
+    const vAttLocation = this.context.getAttribLocation(this.program, 'color')
+    const vStride = 4
+
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vColorBuffer)
+    this.context.enableVertexAttribArray(vAttLocation)
+    this.context.vertexAttribPointer(
+      vAttLocation,
+      vStride,
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
 }
 
 onload = (): void => {
@@ -180,13 +200,12 @@ onload = (): void => {
     1.0
   ]
 
-  // app.setPositions(vertexPositions)
-  app.setPositionAndColor(vertexPositions, vertexColor)
+  app.setVerticesAndColor(vertexPositions, vertexColor)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
   const pMatrix = Matrix.identity(Matrix.create())
-  const mvpMatrix = Matrix.identity(Matrix.create())
+  const vpMatrix = Matrix.identity(Matrix.create())
 
   Matrix.lookAt(
     new Float32Array([0.0, 1.0, 3.0]),
@@ -196,10 +215,37 @@ onload = (): void => {
   )
 
   Matrix.perspective(60, c.width / c.height, 0.1, 100, pMatrix)
+  // ビュープロジェクション行列
+  Matrix.multiply(pMatrix, vMatrix, vpMatrix)
+  app.setViewProjectionMatrix(vpMatrix)
 
-  Matrix.multiply(pMatrix, vMatrix, mvpMatrix)
-  Matrix.multiply(mvpMatrix, mMatrix, mvpMatrix)
+  app.startRender(() => {
+    app.clearColor()
+    const count = app.currentCount
+    const rad = ((count % 360) * Math.PI) / 180
+    const x = Math.cos(rad)
+    const y = Math.sin(rad)
 
-  app.bindMVP(mvpMatrix)
-  app.draw()
+    Matrix.identity(mMatrix)
+    Matrix.translate(mMatrix, new Float32Array([x, y + 1.0, 0.0]), mMatrix)
+    app.setModelMatrix(mMatrix)
+    app.draw()
+
+    Matrix.identity(mMatrix)
+    Matrix.translate(mMatrix, new Float32Array([1.0, -1.0, 0.0]), mMatrix)
+    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix)
+    app.setModelMatrix(mMatrix)
+    app.draw()
+
+    Matrix.identity(mMatrix)
+    const scaleFactor = Math.sin(rad) + 1.0
+    Matrix.translate(mMatrix, new Float32Array([-1.0, -1.0, 0]), mMatrix)
+    Matrix.scale(
+      mMatrix,
+      new Float32Array([scaleFactor, scaleFactor, 0]),
+      mMatrix
+    )
+    app.setModelMatrix(mMatrix)
+    app.draw()
+  })
 }
