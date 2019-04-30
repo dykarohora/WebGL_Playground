@@ -58,16 +58,21 @@ class AppMain {
     }
   }
 
-  public setVerticesAndColor(vertices: number[], colors: number[]): void {
+  public setVerticesAndIndicesAndColors(
+    vertices: number[],
+    indices: number[],
+    colors: number[]
+  ) {
     this.setVertices(vertices)
     this.setColors(colors)
+    this.setIndices(indices)
   }
 
   public setViewProjectionMatrix(matrix: Float32Array) {
     this.viewProjectionMatrix = matrix
   }
 
-  public setModelMatrix(matrix: Float32Array) {
+  public setModelMatrix(matrix: Float32Array): void {
     this.modelMatrix = matrix
     const mvpMatrix = Matrix.identity(Matrix.create())
     Matrix.multiply(this.viewProjectionMatrix, this.modelMatrix, mvpMatrix)
@@ -79,7 +84,7 @@ class AppMain {
     this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix)
   }
 
-  public get currentCount() {
+  public get currentCount(): number {
     return this.count
   }
 
@@ -91,7 +96,13 @@ class AppMain {
   }
 
   public draw(): void {
-    this.context.drawArrays(this.context.TRIANGLES, 0, 3)
+    // this.context.drawArrays(this.context.TRIANGLES, 0, 3)
+    this.context.drawElements(
+      this.context.TRIANGLES,
+      6,
+      this.context.UNSIGNED_SHORT,
+      0
+    )
   }
 
   private createShader(id: string, shaderType: ShaderType): WebGLShader {
@@ -134,6 +145,18 @@ class AppMain {
     return vbo
   }
 
+  private createIbo(data: number[]): WebGLBuffer {
+    const ibo = this.context.createBuffer()
+    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, ibo)
+    this.context.bufferData(
+      this.context.ELEMENT_ARRAY_BUFFER,
+      new Int16Array(data),
+      this.context.STATIC_DRAW
+    )
+    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, null)
+    return ibo
+  }
+
   private setVertices(positions: number[]): void {
     const vPositionBuffer = this.createVbo(positions)
     const vAttLocation = this.context.getAttribLocation(
@@ -152,6 +175,11 @@ class AppMain {
       0,
       0
     )
+  }
+
+  private setIndices(indices: number[]): void {
+    const indexBuffer = this.createIbo(indices)
+    this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, indexBuffer)
   }
 
   private setColors(colors: number[]): void {
@@ -184,23 +212,47 @@ onload = (): void => {
   app.clearColor()
   app.createProgram('vs', 'fs')
 
-  const vertexPositions = [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0]
+  const vertexPositions = [
+    0.0,
+    1.0,
+    0.0,
+
+    1.0,
+    0.0,
+    0.0,
+
+    -1.0,
+    0.0,
+    0.0,
+
+    0.0,
+    -1.0,
+    0.0
+  ]
+  const indices = [0, 1, 2, 1, 2, 3]
   const vertexColor = [
     1.0,
     0.0,
     0.0,
     1.0,
+
     0.0,
     1.0,
     0.0,
     1.0,
+
     0.0,
     0.0,
+    1.0,
+    1.0,
+
+    1.0,
+    1.0,
     1.0,
     1.0
   ]
 
-  app.setVerticesAndColor(vertexPositions, vertexColor)
+  app.setVerticesAndIndicesAndColors(vertexPositions, indices, vertexColor)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())

@@ -160,6 +160,8 @@ onload = () => {
         const scaleFactor = Math.sin(rad) + 1.0;
         Matrix_1.default.translate(mMatrix, new Float32Array([-1.0, -1.0, 0]), mMatrix);
         Matrix_1.default.scale(mMatrix, new Float32Array([scaleFactor, scaleFactor, 0]), mMatrix);
+        app.setModelMatrix(mMatrix);
+        app.draw();
     });
 };
 //# sourceMappingURL=index.js.map
