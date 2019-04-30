@@ -26,6 +26,10 @@ class AppMain {
 
     this.width = canvas.width
     this.height = canvas.height
+
+    this.context.enable(this.context.CULL_FACE)
+    this.context.enable(this.context.DEPTH_TEST)
+    this.context.depthFunc(this.context.LEQUAL)
   }
 
   public clearColor() {
@@ -229,7 +233,7 @@ onload = (): void => {
     -1.0,
     0.0
   ]
-  const indices = [0, 1, 2, 1, 2, 3]
+  const indices = [0, 2, 1, 1, 2, 3]
   const vertexColor = [
     1.0,
     0.0,
@@ -279,24 +283,24 @@ onload = (): void => {
     const y = Math.sin(rad)
 
     Matrix.identity(mMatrix)
-    Matrix.translate(mMatrix, new Float32Array([x, y + 1.0, 0.0]), mMatrix)
+    Matrix.translate(mMatrix, new Float32Array([x, y + 1.0, -1.0]), mMatrix)
     app.setModelMatrix(mMatrix)
     app.draw()
 
     Matrix.identity(mMatrix)
-    Matrix.translate(mMatrix, new Float32Array([1.0, -1.0, 0.0]), mMatrix)
-    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix)
-    app.setModelMatrix(mMatrix)
-    app.draw()
-
-    Matrix.identity(mMatrix)
-    const scaleFactor = Math.sin(rad) + 1.0
-    Matrix.translate(mMatrix, new Float32Array([-1.0, -1.0, 0]), mMatrix)
+    const scaleFactor = Math.sin(rad) + 3.0
+    Matrix.translate(mMatrix, new Float32Array([-1.0, -1.0, 0.0]), mMatrix)
     Matrix.scale(
       mMatrix,
       new Float32Array([scaleFactor, scaleFactor, 0]),
       mMatrix
     )
+    app.setModelMatrix(mMatrix)
+    app.draw()
+
+    Matrix.identity(mMatrix)
+    Matrix.translate(mMatrix, new Float32Array([1.0, -1.0, -1.0]), mMatrix)
+    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix)
     app.setModelMatrix(mMatrix)
     app.draw()
   })
