@@ -12,6 +12,9 @@ class AppMain {
         this.context = canvas.getContext('webgl');
         this.width = canvas.width;
         this.height = canvas.height;
+        this.context.enable(this.context.CULL_FACE);
+        this.context.enable(this.context.DEPTH_TEST);
+        this.context.depthFunc(this.context.LEQUAL);
     }
     clearColor() {
         this.context.clearColor(0, 0, 0, 1);
@@ -35,9 +38,27 @@ class AppMain {
             throw new Error(programLog);
         }
     }
-    setVerticesAndColor(vertices, colors) {
+    setTorusVerticesAndIndicesAndColors(row, column, innerRad, outerRad) {
+        const vertices = new Array();
+        const colors = new Array();
+        const indices = new Array();
+        for (let i = 0; i <= row; i++) {
+            const r = ((Math.PI * 2) / row) * i;
+            const rr = Math.cos(r);
+            const ry = Math.sin(r);
+            for (let ii = 0; ii <= column; ii++) {
+                const tr = ((Math.PI * 2) / column) * ii;
+                const tx = (rr * innerRad + outerRad) * Math.cos(tr);
+                const ty = ry * innerRad;
+                const tz = (rr * innerRad + outerRad) * Math.sin(tr);
+                vertices.push(tx, ty, tz);
+            }
+        }
+    }
+    setVerticesAndIndicesAndColors(vertices, indices, colors) {
         this.setVertices(vertices);
         this.setColors(colors);
+        this.setIndices(indices);
     }
     setViewProjectionMatrix(matrix) {
         this.viewProjectionMatrix = matrix;
@@ -59,7 +80,8 @@ class AppMain {
         }, 1000 / 30);
     }
     draw() {
-        this.context.drawArrays(this.context.TRIANGLES, 0, 3);
+        // this.context.drawArrays(this.context.TRIANGLES, 0, 3)
+        this.context.drawElements(this.context.TRIANGLES, 6, this.context.UNSIGNED_SHORT, 0);
     }
     createShader(id, shaderType) {
         let shader;
@@ -92,6 +114,13 @@ class AppMain {
         this.context.bindBuffer(this.context.ARRAY_BUFFER, null);
         return vbo;
     }
+    createIbo(data) {
+        const ibo = this.context.createBuffer();
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, ibo);
+        this.context.bufferData(this.context.ELEMENT_ARRAY_BUFFER, new Int16Array(data), this.context.STATIC_DRAW);
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, null);
+        return ibo;
+    }
     setVertices(positions) {
         const vPositionBuffer = this.createVbo(positions);
         const vAttLocation = this.context.getAttribLocation(this.program, 'position');
@@ -99,6 +128,10 @@ class AppMain {
         this.context.bindBuffer(this.context.ARRAY_BUFFER, vPositionBuffer);
         this.context.enableVertexAttribArray(vAttLocation);
         this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
+    }
+    setIndices(indices) {
+        const indexBuffer = this.createIbo(indices);
+        this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, indexBuffer);
     }
     setColors(colors) {
         const vColorBuffer = this.createVbo(colors);
@@ -108,6 +141,28 @@ class AppMain {
         this.context.enableVertexAttribArray(vAttLocation);
         this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
     }
+    hsva(h, s, v, a) {
+        if (s > 1 || v > 1 || a > 1) {
+            throw new Error('invalid arguments');
+        }
+        const th = h % 360;
+        const i = Math.floor(th / 60);
+        const f = th / 60 - i;
+        const m = v * (1 - s);
+        const n = v * (1 - s * f);
+        const k = v * (1 - s * (1 - f));
+        const color = new Array();
+        if (!(s > 0) && !(s < 0)) {
+            color.push(v, v, v, a);
+        }
+        else {
+            const r = new Array(v, n, m, m, k, v);
+            const g = new Array(k, v, v, n, m, m);
+            const b = new Array(m, m, k, v, v, n);
+            color.push(r[i], g[i], b[i], a);
+        }
+        return color;
+    }
 }
 onload = () => {
     const c = document.getElementById('canvas');
@@ -116,7 +171,21 @@ onload = () => {
     const app = new AppMain(c);
     app.clearColor();
     app.createProgram('vs', 'fs');
-    const vertexPositions = [0.0, 1.0, 0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0];
+    const vertexPositions = [
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+    ];
+    const indices = [0, 2, 1, 1, 2, 3];
     const vertexColor = [
         1.0,
         0.0,
@@ -129,9 +198,13 @@ onload = () => {
         0.0,
         0.0,
         1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
         1.0
     ];
-    app.setVerticesAndColor(vertexPositions, vertexColor);
+    app.setVerticesAndIndicesAndColors(vertexPositions, indices, vertexColor);
     const mMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const vMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const pMatrix = Matrix_1.default.identity(Matrix_1.default.create());
@@ -148,18 +221,18 @@ onload = () => {
         const x = Math.cos(rad);
         const y = Math.sin(rad);
         Matrix_1.default.identity(mMatrix);
-        Matrix_1.default.translate(mMatrix, new Float32Array([x, y + 1.0, 0.0]), mMatrix);
+        Matrix_1.default.translate(mMatrix, new Float32Array([x, y + 1.0, -1.0]), mMatrix);
         app.setModelMatrix(mMatrix);
         app.draw();
         Matrix_1.default.identity(mMatrix);
-        Matrix_1.default.translate(mMatrix, new Float32Array([1.0, -1.0, 0.0]), mMatrix);
-        Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix);
-        app.setModelMatrix(mMatrix);
-        app.draw();
-        Matrix_1.default.identity(mMatrix);
-        const scaleFactor = Math.sin(rad) + 1.0;
-        Matrix_1.default.translate(mMatrix, new Float32Array([-1.0, -1.0, 0]), mMatrix);
+        const scaleFactor = Math.sin(rad) + 3.0;
+        Matrix_1.default.translate(mMatrix, new Float32Array([-1.0, -1.0, 0.0]), mMatrix);
         Matrix_1.default.scale(mMatrix, new Float32Array([scaleFactor, scaleFactor, 0]), mMatrix);
+        app.setModelMatrix(mMatrix);
+        app.draw();
+        Matrix_1.default.identity(mMatrix);
+        Matrix_1.default.translate(mMatrix, new Float32Array([1.0, -1.0, -1.0]), mMatrix);
+        Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix);
         app.setModelMatrix(mMatrix);
         app.draw();
     });

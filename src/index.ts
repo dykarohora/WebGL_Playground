@@ -20,6 +20,7 @@ class AppMain {
   private modelMatrix: Float32Array
 
   private count: number = 0
+  private indexCount: number = 0
 
   public constructor(canvas: HTMLCanvasElement) {
     this.context = canvas.getContext('webgl')
@@ -60,6 +61,44 @@ class AppMain {
       const programLog = this.context.getProgramInfoLog(program)
       throw new Error(programLog)
     }
+  }
+
+  public setTorusVerticesAndIndicesAndColors(
+    row: number,
+    column: number,
+    innerRad: number,
+    outerRad: number
+  ) {
+    const vertices = new Array<number>()
+    const colors = new Array<number>()
+    const indices = new Array<number>()
+
+    for (let i = 0; i <= row; i++) {
+      const r = ((Math.PI * 2) / row) * i
+      const rr = Math.cos(r)
+      const ry = Math.sin(r)
+      for (let ii = 0; ii <= column; ii++) {
+        const tr = ((Math.PI * 2) / column) * ii
+        const tx = (rr * innerRad + outerRad) * Math.cos(tr)
+        const ty = ry * innerRad
+        const tz = (rr * innerRad + outerRad) * Math.sin(tr)
+        vertices.push(tx, ty, tz)
+        const tc = this.hsva((360.0 / column) * ii, 1, 1, 1)
+        tc.forEach(c => colors.push(c))
+      }
+    }
+
+    for (let i = 0; i < row; i++) {
+      for (let ii = 0; ii < column; ii++) {
+        const r = (column + 1) * i + ii
+        indices.push(r, r + column + 1, r + 1)
+        indices.push(r + column + 1, r + column + 2, r + 1)
+      }
+    }
+    this.indexCount = indices.length
+    this.setVertices(vertices)
+    this.setColors(colors)
+    this.setIndices(indices)
   }
 
   public setVerticesAndIndicesAndColors(
@@ -103,7 +142,7 @@ class AppMain {
     // this.context.drawArrays(this.context.TRIANGLES, 0, 3)
     this.context.drawElements(
       this.context.TRIANGLES,
-      6,
+      this.indexCount,
       this.context.UNSIGNED_SHORT,
       0
     )
@@ -202,6 +241,29 @@ class AppMain {
       0
     )
   }
+
+  private hsva(h: number, s: number, v: number, a: number): number[] {
+    if (s > 1 || v > 1 || a > 1) {
+      throw new Error('invalid arguments')
+    }
+
+    const th = h % 360
+    const i = Math.floor(th / 60)
+    const f = th / 60 - i
+    const m = v * (1 - s)
+    const n = v * (1 - s * f)
+    const k = v * (1 - s * (1 - f))
+    const color = new Array<number>()
+    if (s == 0) {
+      color.push(v, v, v, a)
+    } else {
+      const r = new Array<number>(v, n, m, m, k, v)
+      const g = new Array<number>(k, v, v, n, m, m)
+      const b = new Array<number>(m, m, k, v, v, n)
+      color.push(r[i], g[i], b[i], a)
+    }
+    return color
+  }
 }
 
 onload = (): void => {
@@ -216,47 +278,7 @@ onload = (): void => {
   app.clearColor()
   app.createProgram('vs', 'fs')
 
-  const vertexPositions = [
-    0.0,
-    1.0,
-    0.0,
-
-    1.0,
-    0.0,
-    0.0,
-
-    -1.0,
-    0.0,
-    0.0,
-
-    0.0,
-    -1.0,
-    0.0
-  ]
-  const indices = [0, 2, 1, 1, 2, 3]
-  const vertexColor = [
-    1.0,
-    0.0,
-    0.0,
-    1.0,
-
-    0.0,
-    1.0,
-    0.0,
-    1.0,
-
-    0.0,
-    0.0,
-    1.0,
-    1.0,
-
-    1.0,
-    1.0,
-    1.0,
-    1.0
-  ]
-
-  app.setVerticesAndIndicesAndColors(vertexPositions, indices, vertexColor)
+  app.setTorusVerticesAndIndicesAndColors(32, 32, 1.0, 2.0)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
@@ -264,7 +286,7 @@ onload = (): void => {
   const vpMatrix = Matrix.identity(Matrix.create())
 
   Matrix.lookAt(
-    new Float32Array([0.0, 1.0, 3.0]),
+    new Float32Array([0.0, 0.0, 20.0]),
     new Float32Array([0, 0, 0]),
     new Float32Array([0, 1, 0]),
     vMatrix
@@ -279,28 +301,10 @@ onload = (): void => {
     app.clearColor()
     const count = app.currentCount
     const rad = ((count % 360) * Math.PI) / 180
-    const x = Math.cos(rad)
-    const y = Math.sin(rad)
 
     Matrix.identity(mMatrix)
-    Matrix.translate(mMatrix, new Float32Array([x, y + 1.0, -1.0]), mMatrix)
-    app.setModelMatrix(mMatrix)
-    app.draw()
+    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
 
-    Matrix.identity(mMatrix)
-    const scaleFactor = Math.sin(rad) + 3.0
-    Matrix.translate(mMatrix, new Float32Array([-1.0, -1.0, 0.0]), mMatrix)
-    Matrix.scale(
-      mMatrix,
-      new Float32Array([scaleFactor, scaleFactor, 0]),
-      mMatrix
-    )
-    app.setModelMatrix(mMatrix)
-    app.draw()
-
-    Matrix.identity(mMatrix)
-    Matrix.translate(mMatrix, new Float32Array([1.0, -1.0, -1.0]), mMatrix)
-    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix)
     app.setModelMatrix(mMatrix)
     app.draw()
   })
