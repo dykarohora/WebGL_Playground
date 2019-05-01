@@ -19,6 +19,8 @@ class AppMain {
   private viewProjectionMatrix: Float32Array
   private modelMatrix: Float32Array
 
+  private lightDir: number[]
+
   private count: number = 0
   private indexCount: number = 0
 
@@ -72,6 +74,7 @@ class AppMain {
     const vertices = new Array<number>()
     const colors = new Array<number>()
     const indices = new Array<number>()
+    const normals = new Array<number>()
 
     for (let i = 0; i <= row; i++) {
       const r = ((Math.PI * 2) / row) * i
@@ -82,7 +85,10 @@ class AppMain {
         const tx = (rr * innerRad + outerRad) * Math.cos(tr)
         const ty = ry * innerRad
         const tz = (rr * innerRad + outerRad) * Math.sin(tr)
+        const rx = rr * Math.cos(tr)
+        const rz = rr * Math.sin(tr)
         vertices.push(tx, ty, tz)
+        normals.push(rx, ry, rz)
         const tc = this.hsva((360.0 / column) * ii, 1, 1, 1)
         tc.forEach(c => colors.push(c))
       }
@@ -97,6 +103,7 @@ class AppMain {
     }
     this.indexCount = indices.length
     this.setVertices(vertices)
+    this.setNormals(normals)
     this.setColors(colors)
     this.setIndices(indices)
   }
@@ -125,6 +132,27 @@ class AppMain {
       'mvpMatrix'
     )
     this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix)
+    this.bindModelInverseMatrix()
+  }
+
+  public setLight(lightDir: number[]) {
+    this.lightDir = lightDir
+
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'lightDirection'
+    )
+    this.context.uniform3fv(uniLocation, this.lightDir)
+  }
+
+  private bindModelInverseMatrix() {
+    const invMatrix = Matrix.identity(Matrix.create())
+    Matrix.inverse(this.modelMatrix, invMatrix)
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'invMatrix'
+    )
+    this.context.uniformMatrix4fv(uniLocation, false, invMatrix)
   }
 
   public get currentCount(): number {
@@ -220,6 +248,22 @@ class AppMain {
     )
   }
 
+  private setNormals(normals: number[]): void {
+    const vNormalsBuffer = this.createVbo(normals)
+    const vAttLocation = this.context.getAttribLocation(this.program, 'normal')
+    const vStride = 3
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vNormalsBuffer)
+    this.context.enableVertexAttribArray(vAttLocation)
+    this.context.vertexAttribPointer(
+      vAttLocation,
+      vStride,
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
+
   private setIndices(indices: number[]): void {
     const indexBuffer = this.createIbo(indices)
     this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, indexBuffer)
@@ -278,7 +322,7 @@ onload = (): void => {
   app.clearColor()
   app.createProgram('vs', 'fs')
 
-  app.setTorusVerticesAndIndicesAndColors(32, 32, 1.0, 2.0)
+  app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
@@ -292,15 +336,18 @@ onload = (): void => {
     vMatrix
   )
 
-  Matrix.perspective(60, c.width / c.height, 0.1, 100, pMatrix)
+  Matrix.perspective(45, c.width / c.height, 0.1, 100, pMatrix)
   // ビュープロジェクション行列
   Matrix.multiply(pMatrix, vMatrix, vpMatrix)
   app.setViewProjectionMatrix(vpMatrix)
+  // 光源方向ベクトル
+  const lightDir = [-0.5, 0.5, 0.5]
+  app.setLight(lightDir)
 
   app.startRender(() => {
     app.clearColor()
     const count = app.currentCount
-    const rad = ((count % 360) * Math.PI) / 180
+    const rad = ((count % 360) * Math.PI * 2) / 180
 
     Matrix.identity(mMatrix)
     Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
