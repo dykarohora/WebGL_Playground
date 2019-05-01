@@ -19,7 +19,9 @@ class AppMain {
   private viewProjectionMatrix: Float32Array
   private modelMatrix: Float32Array
 
-  private lightDir: number[]
+  private directionLightDir: number[]
+  private ambientLightDir: number[]
+  private viewDir: number[]
 
   private count: number = 0
   private indexCount: number = 0
@@ -135,14 +137,34 @@ class AppMain {
     this.bindModelInverseMatrix()
   }
 
-  public setLight(lightDir: number[]) {
-    this.lightDir = lightDir
+  public setDirectionLight(lightDir: number[]): void {
+    this.directionLightDir = lightDir
 
     const uniLocation = this.context.getUniformLocation(
       this.program,
       'lightDirection'
     )
-    this.context.uniform3fv(uniLocation, this.lightDir)
+    this.context.uniform3fv(uniLocation, this.directionLightDir)
+  }
+
+  public setAmbientLight(lightDir: number[]): void {
+    this.ambientLightDir = lightDir
+
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'ambientColor'
+    )
+    this.context.uniform4fv(uniLocation, this.ambientLightDir)
+  }
+
+  public setViewDirection(viewDir: number[]) {
+    this.viewDir = viewDir
+
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'eyeDirection'
+    )
+    this.context.uniform3fv(uniLocation, this.viewDir)
   }
 
   private bindModelInverseMatrix() {
@@ -342,7 +364,12 @@ onload = (): void => {
   app.setViewProjectionMatrix(vpMatrix)
   // 光源方向ベクトル
   const lightDir = [-0.5, 0.5, 0.5]
-  app.setLight(lightDir)
+  app.setDirectionLight(lightDir)
+  // アンビエントライト
+  const ambientLightColor = [0.1, 0.1, 0.1, 1.0]
+  app.setAmbientLight(ambientLightColor)
+
+  app.setViewDirection([0.0, 0.0, 20.0])
 
   app.startRender(() => {
     app.clearColor()
