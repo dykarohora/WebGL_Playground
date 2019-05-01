@@ -134,6 +134,16 @@ class AppMain {
       'mvpMatrix'
     )
     this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix)
+
+    const modelMatrixUniLocation = this.context.getUniformLocation(
+      this.program,
+      'mMatrix'
+    )
+    this.context.uniformMatrix4fv(
+      modelMatrixUniLocation,
+      false,
+      this.modelMatrix
+    )
     this.bindModelInverseMatrix()
   }
 
@@ -145,6 +155,14 @@ class AppMain {
       'lightDirection'
     )
     this.context.uniform3fv(uniLocation, this.directionLightDir)
+  }
+
+  public setPointLight(lightPos: number[]): void {
+    const uniLocation = this.context.getUniformLocation(
+      this.program,
+      'lightPosition'
+    )
+    this.context.uniform3fv(uniLocation, lightPos)
   }
 
   public setAmbientLight(lightDir: number[]): void {
@@ -363,8 +381,10 @@ onload = (): void => {
   Matrix.multiply(pMatrix, vMatrix, vpMatrix)
   app.setViewProjectionMatrix(vpMatrix)
   // 光源方向ベクトル
-  const lightDir = [-0.5, 0.5, 0.5]
-  app.setDirectionLight(lightDir)
+  // const lightDir = [-0.5, 0.5, 0.5]
+  // app.setDirectionLight(lightDir)
+  const lightPos = [4, 4, 9]
+  app.setPointLight(lightPos)
   // アンビエントライト
   const ambientLightColor = [0.1, 0.1, 0.1, 1.0]
   app.setAmbientLight(ambientLightColor)

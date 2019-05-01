@@ -9,6 +9,7 @@ var ShaderType;
 class AppMain {
     constructor(canvas) {
         this.count = 0;
+        this.indexCount = 0;
         this.context = canvas.getContext('webgl');
         this.width = canvas.width;
         this.height = canvas.height;
@@ -42,6 +43,7 @@ class AppMain {
         const vertices = new Array();
         const colors = new Array();
         const indices = new Array();
+        const normals = new Array();
         for (let i = 0; i <= row; i++) {
             const r = ((Math.PI * 2) / row) * i;
             const rr = Math.cos(r);
@@ -51,9 +53,26 @@ class AppMain {
                 const tx = (rr * innerRad + outerRad) * Math.cos(tr);
                 const ty = ry * innerRad;
                 const tz = (rr * innerRad + outerRad) * Math.sin(tr);
+                const rx = rr * Math.cos(tr);
+                const rz = rr * Math.sin(tr);
                 vertices.push(tx, ty, tz);
+                normals.push(rx, ry, rz);
+                const tc = this.hsva((360.0 / column) * ii, 1, 1, 1);
+                tc.forEach(c => colors.push(c));
             }
         }
+        for (let i = 0; i < row; i++) {
+            for (let ii = 0; ii < column; ii++) {
+                const r = (column + 1) * i + ii;
+                indices.push(r, r + column + 1, r + 1);
+                indices.push(r + column + 1, r + column + 2, r + 1);
+            }
+        }
+        this.indexCount = indices.length;
+        this.setVertices(vertices);
+        this.setNormals(normals);
+        this.setColors(colors);
+        this.setIndices(indices);
     }
     setVerticesAndIndicesAndColors(vertices, indices, colors) {
         this.setVertices(vertices);
@@ -69,6 +88,32 @@ class AppMain {
         Matrix_1.default.multiply(this.viewProjectionMatrix, this.modelMatrix, mvpMatrix);
         const uniLocation = this.context.getUniformLocation(this.program, 'mvpMatrix');
         this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix);
+        this.bindModelInverseMatrix();
+    }
+    setDirectionLight(lightDir) {
+        this.directionLightDir = lightDir;
+        const uniLocation = this.context.getUniformLocation(this.program, 'lightDirection');
+        this.context.uniform3fv(uniLocation, this.directionLightDir);
+    }
+    setPointLight(lightPos) {
+        const uniLocation = this.context.getUniformLocation(this.program, 'lightPosition');
+        this.context.uniform3fv(uniLocation, lightPos);
+    }
+    setAmbientLight(lightDir) {
+        this.ambientLightDir = lightDir;
+        const uniLocation = this.context.getUniformLocation(this.program, 'ambientColor');
+        this.context.uniform4fv(uniLocation, this.ambientLightDir);
+    }
+    setViewDirection(viewDir) {
+        this.viewDir = viewDir;
+        const uniLocation = this.context.getUniformLocation(this.program, 'eyeDirection');
+        this.context.uniform3fv(uniLocation, this.viewDir);
+    }
+    bindModelInverseMatrix() {
+        const invMatrix = Matrix_1.default.identity(Matrix_1.default.create());
+        Matrix_1.default.inverse(this.modelMatrix, invMatrix);
+        const uniLocation = this.context.getUniformLocation(this.program, 'invMatrix');
+        this.context.uniformMatrix4fv(uniLocation, false, invMatrix);
     }
     get currentCount() {
         return this.count;
@@ -81,7 +126,7 @@ class AppMain {
     }
     draw() {
         // this.context.drawArrays(this.context.TRIANGLES, 0, 3)
-        this.context.drawElements(this.context.TRIANGLES, 6, this.context.UNSIGNED_SHORT, 0);
+        this.context.drawElements(this.context.TRIANGLES, this.indexCount, this.context.UNSIGNED_SHORT, 0);
     }
     createShader(id, shaderType) {
         let shader;
@@ -129,6 +174,14 @@ class AppMain {
         this.context.enableVertexAttribArray(vAttLocation);
         this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
     }
+    setNormals(normals) {
+        const vNormalsBuffer = this.createVbo(normals);
+        const vAttLocation = this.context.getAttribLocation(this.program, 'normal');
+        const vStride = 3;
+        this.context.bindBuffer(this.context.ARRAY_BUFFER, vNormalsBuffer);
+        this.context.enableVertexAttribArray(vAttLocation);
+        this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
+    }
     setIndices(indices) {
         const indexBuffer = this.createIbo(indices);
         this.context.bindBuffer(this.context.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -152,7 +205,7 @@ class AppMain {
         const n = v * (1 - s * f);
         const k = v * (1 - s * (1 - f));
         const color = new Array();
-        if (!(s > 0) && !(s < 0)) {
+        if (s == 0) {
             color.push(v, v, v, a);
         }
         else {
@@ -171,68 +224,29 @@ onload = () => {
     const app = new AppMain(c);
     app.clearColor();
     app.createProgram('vs', 'fs');
-    const vertexPositions = [
-        0.0,
-        1.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        -1.0,
-        0.0,
-        0.0,
-        0.0,
-        -1.0,
-        0.0
-    ];
-    const indices = [0, 2, 1, 1, 2, 3];
-    const vertexColor = [
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        0.0,
-        1.0,
-        0.0,
-        1.0,
-        0.0,
-        0.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
-    ];
-    app.setVerticesAndIndicesAndColors(vertexPositions, indices, vertexColor);
+    app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0);
     const mMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const vMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const pMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const vpMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    Matrix_1.default.lookAt(new Float32Array([0.0, 1.0, 3.0]), new Float32Array([0, 0, 0]), new Float32Array([0, 1, 0]), vMatrix);
-    Matrix_1.default.perspective(60, c.width / c.height, 0.1, 100, pMatrix);
+    Matrix_1.default.lookAt(new Float32Array([0.0, 0.0, 20.0]), new Float32Array([0, 0, 0]), new Float32Array([0, 1, 0]), vMatrix);
+    Matrix_1.default.perspective(45, c.width / c.height, 0.1, 100, pMatrix);
     // ビュープロジェクション行列
     Matrix_1.default.multiply(pMatrix, vMatrix, vpMatrix);
     app.setViewProjectionMatrix(vpMatrix);
+    // 光源方向ベクトル
+    const lightDir = [-0.5, 0.5, 0.5];
+    app.setDirectionLight(lightDir);
+    // アンビエントライト
+    const ambientLightColor = [0.1, 0.1, 0.1, 1.0];
+    app.setAmbientLight(ambientLightColor);
+    app.setViewDirection([0.0, 0.0, 20.0]);
     app.startRender(() => {
         app.clearColor();
         const count = app.currentCount;
-        const rad = ((count % 360) * Math.PI) / 180;
-        const x = Math.cos(rad);
-        const y = Math.sin(rad);
+        const rad = ((count % 360) * Math.PI * 2) / 180;
         Matrix_1.default.identity(mMatrix);
-        Matrix_1.default.translate(mMatrix, new Float32Array([x, y + 1.0, -1.0]), mMatrix);
-        app.setModelMatrix(mMatrix);
-        app.draw();
-        Matrix_1.default.identity(mMatrix);
-        const scaleFactor = Math.sin(rad) + 3.0;
-        Matrix_1.default.translate(mMatrix, new Float32Array([-1.0, -1.0, 0.0]), mMatrix);
-        Matrix_1.default.scale(mMatrix, new Float32Array([scaleFactor, scaleFactor, 0]), mMatrix);
-        app.setModelMatrix(mMatrix);
-        app.draw();
-        Matrix_1.default.identity(mMatrix);
-        Matrix_1.default.translate(mMatrix, new Float32Array([1.0, -1.0, -1.0]), mMatrix);
-        Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 0]), mMatrix);
+        Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix);
         app.setModelMatrix(mMatrix);
         app.draw();
     });
