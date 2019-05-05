@@ -26,6 +26,8 @@ class AppMain {
   private count: number = 0
   private indexCount: number = 0
 
+  private texture: WebGLTexture
+
   public constructor(canvas: HTMLCanvasElement) {
     this.context = canvas.getContext('webgl')
 
@@ -35,6 +37,7 @@ class AppMain {
     this.context.enable(this.context.CULL_FACE)
     this.context.enable(this.context.DEPTH_TEST)
     this.context.depthFunc(this.context.LEQUAL)
+    this.context.activeTexture(this.context.TEXTURE0)
   }
 
   public clearColor() {
@@ -65,6 +68,79 @@ class AppMain {
       const programLog = this.context.getProgramInfoLog(program)
       throw new Error(programLog)
     }
+  }
+
+  public setQuad() {
+    const vertices = [
+      -1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      0.0,
+      -1.0,
+      -1.0,
+      0.0,
+      1.0,
+      -1.0,
+      0.0
+    ]
+
+    const colors = [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+
+    const indices = [0, 2, 1, 3, 1, 2]
+
+    const textureCoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+
+    this.indexCount = indices.length
+    this.setVertices(vertices)
+    this.setColors(colors)
+    this.setTextureCoords(textureCoords)
+    this.setIndices(indices)
+  }
+
+  public createTexture(source: string) {
+    const img = new Image()
+    img.onload = (): void => {
+      const tex = this.context.createTexture()
+      this.context.bindTexture(this.context.TEXTURE_2D, tex)
+      this.context.texImage2D(
+        this.context.TEXTURE_2D,
+        0,
+        this.context.RGBA,
+        this.context.RGBA,
+        this.context.UNSIGNED_BYTE,
+        img
+      )
+      this.context.generateMipmap(this.context.TEXTURE_2D)
+      this.context.bindTexture(this.context.TEXTURE_2D, null)
+      this.texture = tex
+    }
+
+    img.src = source
+  }
+
+  public setTexture() {
+    const uniLocation = this.context.getUniformLocation(this.program, 'texture')
+    this.context.bindTexture(this.context.TEXTURE_2D, this.texture)
+    this.context.uniform1i(uniLocation, 0)
   }
 
   public setTorusVerticesAndIndicesAndColors(
@@ -288,6 +364,25 @@ class AppMain {
     )
   }
 
+  private setTextureCoords(textureCoords: number[]): void {
+    const vTextureCoordBuffer = this.createVbo(textureCoords)
+    const vAttLocation = this.context.getAttribLocation(
+      this.program,
+      'textureCoord'
+    )
+    const vStride = 2
+    this.context.bindBuffer(this.context.ARRAY_BUFFER, vTextureCoordBuffer)
+    this.context.enableVertexAttribArray(vAttLocation)
+    this.context.vertexAttribPointer(
+      vAttLocation,
+      vStride,
+      this.context.FLOAT,
+      false,
+      0,
+      0
+    )
+  }
+
   private setNormals(normals: number[]): void {
     const vNormalsBuffer = this.createVbo(normals)
     const vAttLocation = this.context.getAttribLocation(this.program, 'normal')
@@ -362,7 +457,9 @@ onload = (): void => {
   app.clearColor()
   app.createProgram('vs', 'fs')
 
-  app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0)
+  app.setQuad()
+  app.createTexture('/hana.png')
+  // app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
@@ -370,7 +467,7 @@ onload = (): void => {
   const vpMatrix = Matrix.identity(Matrix.create())
 
   Matrix.lookAt(
-    new Float32Array([0.0, 0.0, 20.0]),
+    new Float32Array([0.0, 1.0, 5.0]),
     new Float32Array([0, 0, 0]),
     new Float32Array([0, 1, 0]),
     vMatrix
@@ -397,9 +494,10 @@ onload = (): void => {
     const rad = ((count % 360) * Math.PI * 2) / 180
 
     Matrix.identity(mMatrix)
-    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
+    // Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
 
     app.setModelMatrix(mMatrix)
+    app.setTexture()
     app.draw()
   })
 }
