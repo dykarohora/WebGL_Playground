@@ -26,7 +26,8 @@ class AppMain {
   private count: number = 0
   private indexCount: number = 0
 
-  private texture: WebGLTexture
+  private texture0: WebGLTexture
+  private texture1: WebGLTexture
 
   public constructor(canvas: HTMLCanvasElement) {
     this.context = canvas.getContext('webgl')
@@ -37,7 +38,9 @@ class AppMain {
     this.context.enable(this.context.CULL_FACE)
     this.context.enable(this.context.DEPTH_TEST)
     this.context.depthFunc(this.context.LEQUAL)
+
     this.context.activeTexture(this.context.TEXTURE0)
+    this.context.activeTexture(this.context.TEXTURE1)
   }
 
   public clearColor() {
@@ -116,7 +119,7 @@ class AppMain {
     this.setIndices(indices)
   }
 
-  public createTexture(source: string) {
+  public createTexture(source: string, unitNumber: number) {
     const img = new Image()
     img.onload = (): void => {
       const tex = this.context.createTexture()
@@ -131,16 +134,37 @@ class AppMain {
       )
       this.context.generateMipmap(this.context.TEXTURE_2D)
       this.context.bindTexture(this.context.TEXTURE_2D, null)
-      this.texture = tex
+      switch (unitNumber) {
+        case 0:
+          this.texture0 = tex
+          break
+        case 1:
+          this.texture1 = tex
+          break
+        default:
+          break
+      }
     }
 
     img.src = source
   }
 
   public setTexture() {
-    const uniLocation = this.context.getUniformLocation(this.program, 'texture')
-    this.context.bindTexture(this.context.TEXTURE_2D, this.texture)
-    this.context.uniform1i(uniLocation, 0)
+    const uniLocation0 = this.context.getUniformLocation(
+      this.program,
+      'texture0'
+    )
+    const uniLocation1 = this.context.getUniformLocation(
+      this.program,
+      'texture1'
+    )
+    this.context.activeTexture(this.context.TEXTURE0)
+    this.context.bindTexture(this.context.TEXTURE_2D, this.texture0)
+    this.context.uniform1i(uniLocation0, 0)
+
+    this.context.activeTexture(this.context.TEXTURE1)
+    this.context.bindTexture(this.context.TEXTURE_2D, this.texture1)
+    this.context.uniform1i(uniLocation1, 1)
   }
 
   public setTorusVerticesAndIndicesAndColors(
@@ -458,7 +482,8 @@ onload = (): void => {
   app.createProgram('vs', 'fs')
 
   app.setQuad()
-  app.createTexture('/hana.png')
+  app.createTexture('/hana.png', 0)
+  app.createTexture('/hoge.png', 1)
   // app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0)
 
   const mMatrix = Matrix.identity(Matrix.create())
@@ -494,7 +519,7 @@ onload = (): void => {
     const rad = ((count % 360) * Math.PI * 2) / 180
 
     Matrix.identity(mMatrix)
-    // Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
+    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
 
     app.setModelMatrix(mMatrix)
     app.setTexture()
