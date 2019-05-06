@@ -1,4 +1,5 @@
 import Matrix from './Matrix'
+import Quaternion from './Quaternion'
 
 enum ShaderType {
   Vertex,
@@ -475,33 +476,21 @@ onload = (): void => {
   ) as HTMLCanvasElement
 
   c.width = 500
-  c.height = 300
+  c.height = 500
 
   const app = new AppMain(c)
   app.clearColor()
   app.createProgram('vs', 'fs')
 
-  app.setQuad()
-  app.createTexture('/hana.png', 0)
-  app.createTexture('/hoge.png', 1)
-  // app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0)
+  app.setTorusVerticesAndIndicesAndColors(64, 64, 0.5, 1.5)
 
   const mMatrix = Matrix.identity(Matrix.create())
   const vMatrix = Matrix.identity(Matrix.create())
   const pMatrix = Matrix.identity(Matrix.create())
   const vpMatrix = Matrix.identity(Matrix.create())
 
-  Matrix.lookAt(
-    new Float32Array([0.0, 1.0, 5.0]),
-    new Float32Array([0, 0, 0]),
-    new Float32Array([0, 1, 0]),
-    vMatrix
-  )
-
   Matrix.perspective(45, c.width / c.height, 0.1, 100, pMatrix)
-  // ビュープロジェクション行列
-  Matrix.multiply(pMatrix, vMatrix, vpMatrix)
-  app.setViewProjectionMatrix(vpMatrix)
+
   // 光源方向ベクトル
   // const lightDir = [-0.5, 0.5, 0.5]
   // app.setDirectionLight(lightDir)
@@ -513,16 +502,45 @@ onload = (): void => {
 
   app.setViewDirection([0.0, 0.0, 20.0])
 
+  const cameraPosition = new Float32Array([0.0, 0.0, 10.0])
+  const cameraUpVec = new Float32Array([0.0, 1.0, 0.0])
+
+  const quaternion = Quaternion.identity(Quaternion.create())
+
   app.startRender(() => {
     app.clearColor()
     const count = app.currentCount
-    const rad = ((count % 360) * Math.PI * 2) / 180
+    const rad = ((count % 360) * Math.PI) / 45
+    const rad2 = ((count % 180) * Math.PI) / 90
+
+    Quaternion.rotate(rad, new Float32Array([1.0, 0.0, 0.0]), quaternion)
+
+    Quaternion.toVecIII(
+      new Float32Array([0.0, 0.0, 10.0]),
+      quaternion,
+      cameraPosition
+    )
+
+    Quaternion.toVecIII(
+      new Float32Array([0.0, 1.0, 0.0]),
+      quaternion,
+      cameraUpVec
+    )
+
+    Matrix.lookAt(
+      cameraPosition,
+      new Float32Array([0, 0, 0]),
+      cameraUpVec,
+      vMatrix
+    )
+
+    Matrix.multiply(pMatrix, vMatrix, vpMatrix)
+    app.setViewProjectionMatrix(vpMatrix)
 
     Matrix.identity(mMatrix)
-    Matrix.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix)
-
+    Matrix.rotate(mMatrix, rad2, new Float32Array([0, 1, 0]), mMatrix)
     app.setModelMatrix(mMatrix)
-    app.setTexture()
+
     app.draw()
   })
 }

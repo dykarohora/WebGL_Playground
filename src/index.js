@@ -16,6 +16,8 @@ class AppMain {
         this.context.enable(this.context.CULL_FACE);
         this.context.enable(this.context.DEPTH_TEST);
         this.context.depthFunc(this.context.LEQUAL);
+        this.context.activeTexture(this.context.TEXTURE0);
+        this.context.activeTexture(this.context.TEXTURE1);
     }
     clearColor() {
         this.context.clearColor(0, 0, 0, 1);
@@ -38,6 +40,78 @@ class AppMain {
             const programLog = this.context.getProgramInfoLog(program);
             throw new Error(programLog);
         }
+    }
+    setQuad() {
+        const vertices = [
+            -1.0,
+            1.0,
+            0.0,
+            1.0,
+            1.0,
+            0.0,
+            -1.0,
+            -1.0,
+            0.0,
+            1.0,
+            -1.0,
+            0.0
+        ];
+        const colors = [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+        ];
+        const indices = [0, 2, 1, 3, 1, 2];
+        const textureCoords = [0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0];
+        this.indexCount = indices.length;
+        this.setVertices(vertices);
+        this.setColors(colors);
+        this.setTextureCoords(textureCoords);
+        this.setIndices(indices);
+    }
+    createTexture(source, unitNumber) {
+        const img = new Image();
+        img.onload = () => {
+            const tex = this.context.createTexture();
+            this.context.bindTexture(this.context.TEXTURE_2D, tex);
+            this.context.texImage2D(this.context.TEXTURE_2D, 0, this.context.RGBA, this.context.RGBA, this.context.UNSIGNED_BYTE, img);
+            this.context.generateMipmap(this.context.TEXTURE_2D);
+            this.context.bindTexture(this.context.TEXTURE_2D, null);
+            switch (unitNumber) {
+                case 0:
+                    this.texture0 = tex;
+                    break;
+                case 1:
+                    this.texture1 = tex;
+                    break;
+                default:
+                    break;
+            }
+        };
+        img.src = source;
+    }
+    setTexture() {
+        const uniLocation0 = this.context.getUniformLocation(this.program, 'texture0');
+        const uniLocation1 = this.context.getUniformLocation(this.program, 'texture1');
+        this.context.activeTexture(this.context.TEXTURE0);
+        this.context.bindTexture(this.context.TEXTURE_2D, this.texture0);
+        this.context.uniform1i(uniLocation0, 0);
+        this.context.activeTexture(this.context.TEXTURE1);
+        this.context.bindTexture(this.context.TEXTURE_2D, this.texture1);
+        this.context.uniform1i(uniLocation1, 1);
     }
     setTorusVerticesAndIndicesAndColors(row, column, innerRad, outerRad) {
         const vertices = new Array();
@@ -88,6 +162,8 @@ class AppMain {
         Matrix_1.default.multiply(this.viewProjectionMatrix, this.modelMatrix, mvpMatrix);
         const uniLocation = this.context.getUniformLocation(this.program, 'mvpMatrix');
         this.context.uniformMatrix4fv(uniLocation, false, mvpMatrix);
+        const modelMatrixUniLocation = this.context.getUniformLocation(this.program, 'mMatrix');
+        this.context.uniformMatrix4fv(modelMatrixUniLocation, false, this.modelMatrix);
         this.bindModelInverseMatrix();
     }
     setDirectionLight(lightDir) {
@@ -174,6 +250,14 @@ class AppMain {
         this.context.enableVertexAttribArray(vAttLocation);
         this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
     }
+    setTextureCoords(textureCoords) {
+        const vTextureCoordBuffer = this.createVbo(textureCoords);
+        const vAttLocation = this.context.getAttribLocation(this.program, 'textureCoord');
+        const vStride = 2;
+        this.context.bindBuffer(this.context.ARRAY_BUFFER, vTextureCoordBuffer);
+        this.context.enableVertexAttribArray(vAttLocation);
+        this.context.vertexAttribPointer(vAttLocation, vStride, this.context.FLOAT, false, 0, 0);
+    }
     setNormals(normals) {
         const vNormalsBuffer = this.createVbo(normals);
         const vAttLocation = this.context.getAttribLocation(this.program, 'normal');
@@ -219,8 +303,8 @@ class AppMain {
 }
 onload = () => {
     const c = document.getElementById('canvas');
-    c.width = 500;
-    c.height = 300;
+    c.width = 2000;
+    c.height = 2000;
     const app = new AppMain(c);
     app.clearColor();
     app.createProgram('vs', 'fs');
@@ -235,8 +319,10 @@ onload = () => {
     Matrix_1.default.multiply(pMatrix, vMatrix, vpMatrix);
     app.setViewProjectionMatrix(vpMatrix);
     // 光源方向ベクトル
-    const lightDir = [-0.5, 0.5, 0.5];
-    app.setDirectionLight(lightDir);
+    // const lightDir = [-0.5, 0.5, 0.5]
+    // app.setDirectionLight(lightDir)
+    const lightPos = [4, 4, 9];
+    app.setPointLight(lightPos);
     // アンビエントライト
     const ambientLightColor = [0.1, 0.1, 0.1, 1.0];
     app.setAmbientLight(ambientLightColor);
@@ -244,7 +330,7 @@ onload = () => {
     app.startRender(() => {
         app.clearColor();
         const count = app.currentCount;
-        const rad = ((count % 360) * Math.PI * 2) / 180;
+        const rad = ((count % 360 * 0.5) * Math.PI * 2) / 180;
         Matrix_1.default.identity(mMatrix);
         Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix);
         app.setModelMatrix(mMatrix);
