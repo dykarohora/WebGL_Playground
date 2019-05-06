@@ -15,12 +15,12 @@ class Quaternion {
         dest[0] = -qtn[0];
         dest[1] = -qtn[1];
         dest[2] = -qtn[2];
-        dest[3] = -qtn[3];
+        dest[3] = qtn[3];
         return dest;
     }
     static normalize(dest) {
-        const x = dest[0], y = dest[1], z = dest[2], w = dest[3];
-        let l = Math.sqrt(x * x + y * y + z * z + w * w);
+        var x = dest[0], y = dest[1], z = dest[2], w = dest[3];
+        var l = Math.sqrt(x * x + y * y + z * z + w * w);
         if (l === 0) {
             dest[0] = 0;
             dest[1] = 0;
@@ -37,8 +37,8 @@ class Quaternion {
         return dest;
     }
     static multiply(qtn1, qtn2, dest) {
-        const ax = qtn1[0], ay = qtn1[1], az = qtn1[2], aw = qtn1[3];
-        const bx = qtn2[0], by = qtn2[1], bz = qtn2[2], bw = qtn2[3];
+        var ax = qtn1[0], ay = qtn1[1], az = qtn1[2], aw = qtn1[3];
+        var bx = qtn2[0], by = qtn2[1], bz = qtn2[2], bw = qtn2[3];
         dest[0] = ax * bw + aw * bx + ay * bz - az * by;
         dest[1] = ay * bw + aw * by + az * bx - ax * bz;
         dest[2] = az * bw + aw * bz + ax * by - ay * bx;
@@ -46,18 +46,18 @@ class Quaternion {
         return dest;
     }
     static rotate(angle, axis, dest) {
-        let sq = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+        var sq = Math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
         if (!sq) {
             return null;
         }
-        let a = axis[0], b = axis[1], c = axis[2];
+        var a = axis[0], b = axis[1], c = axis[2];
         if (sq != 1) {
             sq = 1 / sq;
             a *= sq;
             b *= sq;
             c *= sq;
         }
-        const s = Math.sin(angle * 0.5);
+        var s = Math.sin(angle * 0.5);
         dest[0] = a * s;
         dest[1] = b * s;
         dest[2] = c * s;
@@ -65,9 +65,9 @@ class Quaternion {
         return dest;
     }
     static toVecIII(vec, qtn, dest) {
-        const qp = this.create();
-        const qq = this.create();
-        const qr = this.create();
+        var qp = this.create();
+        var qq = this.create();
+        var qr = this.create();
         this.inverse(qtn, qr);
         qp[0] = vec[0];
         qp[1] = vec[1];
@@ -80,11 +80,11 @@ class Quaternion {
         return dest;
     }
     static toMatIV(qtn, dest) {
-        const x = qtn[0], y = qtn[1], z = qtn[2], w = qtn[3];
-        const x2 = x + x, y2 = y + y, z2 = z + z;
-        const xx = x * x2, xy = x * y2, xz = x * z2;
-        const yy = y * y2, yz = y * z2, zz = z * z2;
-        const wx = w * x2, wy = w * y2, wz = w * z2;
+        var x = qtn[0], y = qtn[1], z = qtn[2], w = qtn[3];
+        var x2 = x + x, y2 = y + y, z2 = z + z;
+        var xx = x * x2, xy = x * y2, xz = x * z2;
+        var yy = y * y2, yz = y * z2, zz = z * z2;
+        var wx = w * x2, wy = w * y2, wz = w * z2;
         dest[0] = 1 - (yy + zz);
         dest[1] = xy - wz;
         dest[2] = xz + wy;
@@ -104,11 +104,11 @@ class Quaternion {
         return dest;
     }
     static slerp(qtn1, qtn2, time, dest) {
-        const ht = qtn1[0] * qtn2[0] +
+        var ht = qtn1[0] * qtn2[0] +
             qtn1[1] * qtn2[1] +
             qtn1[2] * qtn2[2] +
             qtn1[3] * qtn2[3];
-        let hs = 1.0 - ht * ht;
+        var hs = 1.0 - ht * ht;
         if (hs <= 0.0) {
             dest[0] = qtn1[0];
             dest[1] = qtn1[1];
@@ -124,10 +124,10 @@ class Quaternion {
                 dest[3] = qtn1[3] * 0.5 + qtn2[3] * 0.5;
             }
             else {
-                const ph = Math.acos(ht);
-                const pt = ph * time;
-                const t0 = Math.sin(ph - pt) / hs;
-                const t1 = Math.sin(pt) / hs;
+                var ph = Math.acos(ht);
+                var pt = ph * time;
+                var t0 = Math.sin(ph - pt) / hs;
+                var t1 = Math.sin(pt) / hs;
                 dest[0] = qtn1[0] * t0 + qtn2[0] * t1;
                 dest[1] = qtn1[1] * t0 + qtn2[1] * t1;
                 dest[2] = qtn1[2] * t0 + qtn2[2] * t1;

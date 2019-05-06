@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const Matrix_1 = require("./Matrix");
+const Quaternion_1 = require("./Quaternion");
 var ShaderType;
 (function (ShaderType) {
     ShaderType[ShaderType["Vertex"] = 0] = "Vertex";
@@ -303,21 +304,17 @@ class AppMain {
 }
 onload = () => {
     const c = document.getElementById('canvas');
-    c.width = 2000;
-    c.height = 2000;
+    c.width = 500;
+    c.height = 500;
     const app = new AppMain(c);
     app.clearColor();
     app.createProgram('vs', 'fs');
-    app.setTorusVerticesAndIndicesAndColors(64, 64, 2.0, 5.0);
+    app.setTorusVerticesAndIndicesAndColors(64, 64, 0.5, 1.5);
     const mMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const vMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const pMatrix = Matrix_1.default.identity(Matrix_1.default.create());
     const vpMatrix = Matrix_1.default.identity(Matrix_1.default.create());
-    Matrix_1.default.lookAt(new Float32Array([0.0, 0.0, 20.0]), new Float32Array([0, 0, 0]), new Float32Array([0, 1, 0]), vMatrix);
     Matrix_1.default.perspective(45, c.width / c.height, 0.1, 100, pMatrix);
-    // ビュープロジェクション行列
-    Matrix_1.default.multiply(pMatrix, vMatrix, vpMatrix);
-    app.setViewProjectionMatrix(vpMatrix);
     // 光源方向ベクトル
     // const lightDir = [-0.5, 0.5, 0.5]
     // app.setDirectionLight(lightDir)
@@ -327,12 +324,38 @@ onload = () => {
     const ambientLightColor = [0.1, 0.1, 0.1, 1.0];
     app.setAmbientLight(ambientLightColor);
     app.setViewDirection([0.0, 0.0, 20.0]);
+    const cameraPosition = new Float32Array([0.0, 0.0, 10.0]);
+    const cameraUpVec = new Float32Array([0.0, 1.0, 0.0]);
+    const quaternion = Quaternion_1.default.identity(Quaternion_1.default.create());
+    c.addEventListener('mousemove', (event) => {
+        const cw = c.width;
+        const ch = c.height;
+        // 対角線の長さの逆数
+        const wh = 1 / Math.sqrt(cw * cw + ch * ch);
+        // マウス座標をcanvasの中心に補正する
+        let x = event.clientX - c.offsetLeft - cw * 0.5;
+        let y = event.clientY - c.offsetTop - ch * 0.5;
+        // canvasの中心からマウス座標までの距離
+        let sq = Math.sqrt(x * x + y * y);
+        const r = sq * 2.0 * Math.PI * wh;
+        if (sq != 1) {
+            sq = 1 / sq;
+            // -1 〜 1の間に正規化
+            x *= sq;
+            y *= sq;
+        }
+        Quaternion_1.default.rotate(r, [y, x, 0.0], quaternion);
+    }, true);
     app.startRender(() => {
         app.clearColor();
         const count = app.currentCount;
-        const rad = ((count % 360 * 0.5) * Math.PI * 2) / 180;
+        Matrix_1.default.lookAt(cameraPosition, new Float32Array([0, 0, 0]), cameraUpVec, vMatrix);
+        Matrix_1.default.multiply(pMatrix, vMatrix, vpMatrix);
+        app.setViewProjectionMatrix(vpMatrix);
         Matrix_1.default.identity(mMatrix);
-        Matrix_1.default.rotate(mMatrix, rad, new Float32Array([0, 1, 1]), mMatrix);
+        const qMatrix = Matrix_1.default.identity(Matrix_1.default.create());
+        Quaternion_1.default.toMatIV(quaternion, qMatrix);
+        Matrix_1.default.multiply(mMatrix, qMatrix, mMatrix);
         app.setModelMatrix(mMatrix);
         app.draw();
     });

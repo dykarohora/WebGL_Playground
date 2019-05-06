@@ -507,25 +507,33 @@ onload = (): void => {
 
   const quaternion = Quaternion.identity(Quaternion.create())
 
+  c.addEventListener(
+    'mousemove',
+    (event: MouseEvent) => {
+      const cw = c.width
+      const ch = c.height
+      // 対角線の長さの逆数
+      const wh = 1 / Math.sqrt(cw * cw + ch * ch)
+      // マウス座標をcanvasの中心に補正する
+      let x = event.clientX - c.offsetLeft - cw * 0.5
+      let y = event.clientY - c.offsetTop - ch * 0.5
+      // canvasの中心からマウス座標までの距離
+      let sq = Math.sqrt(x * x + y * y)
+      const r = sq * 2.0 * Math.PI * wh
+      if (sq != 1) {
+        sq = 1 / sq
+        // -1 〜 1の間に正規化
+        x *= sq
+        y *= sq
+      }
+      Quaternion.rotate(r, [y, x, 0.0], quaternion)
+    },
+    true
+  )
+
   app.startRender(() => {
     app.clearColor()
     const count = app.currentCount
-    const rad = ((count % 360) * Math.PI) / 45
-    const rad2 = ((count % 180) * Math.PI) / 90
-
-    Quaternion.rotate(rad, new Float32Array([1.0, 0.0, 0.0]), quaternion)
-
-    Quaternion.toVecIII(
-      new Float32Array([0.0, 0.0, 10.0]),
-      quaternion,
-      cameraPosition
-    )
-
-    Quaternion.toVecIII(
-      new Float32Array([0.0, 1.0, 0.0]),
-      quaternion,
-      cameraUpVec
-    )
 
     Matrix.lookAt(
       cameraPosition,
@@ -538,7 +546,10 @@ onload = (): void => {
     app.setViewProjectionMatrix(vpMatrix)
 
     Matrix.identity(mMatrix)
-    Matrix.rotate(mMatrix, rad2, new Float32Array([0, 1, 0]), mMatrix)
+
+    const qMatrix = Matrix.identity(Matrix.create())
+    Quaternion.toMatIV(quaternion, qMatrix)
+    Matrix.multiply(mMatrix, qMatrix, mMatrix)
     app.setModelMatrix(mMatrix)
 
     app.draw()
